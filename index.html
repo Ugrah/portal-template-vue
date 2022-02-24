@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Portal - Grulog Admin Dashboard Template For Developers</title>
+
+    <!-- Meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="description" content="Portal - Grulog Admin Dashboard Template For Developers">
+    <meta name="author" content="Ulrich Grah">
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <!-- FontAwesome JS-->
+    <!-- <script defer src="assets/plugins/fontawesome/js/all.min.js"></script>
+    <link id="fontawesome-style" rel="stylesheet" href="assets/plugins/fontawesome/css/all.css"> -->
+
+
+    <link id="fontawesome-style" rel="stylesheet" href="assets/plugins/fontawesome-free-6.0.0/css/all.css">
+
+    <!-- App CSS -->
+    <link id="theme-style" rel="stylesheet" href="assets/css/portal.css">
+
+</head>
+
+<body class="app">
+
+    <div id="app">
+        <app-header v-if="showHeader"></app-header>
+
+        <router-view :key="$route.path"></router-view>
+
+    </div>
+
+
+    <!-- Javascript -->
+    <script src="assets/plugins/popper.min.js"></script>
+    <script src="assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+
+    <script defer src="assets/plugins/fontawesome-free-6.0.0/js/all.min.js"></script>
+
+
+    <!-- Charts JS -->
+    <script src="assets/plugins/chart.js/chart.min.js"></script>
+    <!-- <script src="assets/js/index-charts.js"></script> -->
+
+    <!-- Axios CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.26.0/axios.min.js"
+        integrity="sha512-bPh3uwgU5qEMipS/VOmRqynnMXGGSRv+72H/N260MQeXZIK4PG48401Bsby9Nq5P5fz7hy5UGNmC/W1Z51h2GQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <!-- Page Specific JS -->
+    <!-- <script src="assets/js/app.js"></script> -->
+    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- VueJS + VueRouter + VueLoaderJS + Vuex -->
+    <script src="https://unpkg.com/vue@next"></script>
+    <script src="https://unpkg.com/vue-router@4"></script>
+    <script src="https://unpkg.com/vuex@4.0.2/dist/vuex.global.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue3-sfc-loader/dist/vue3-sfc-loader.js"></script>
+
+
+    <!-- Lastly add this package -->
+    <script src="https://cdn.jsdelivr.net/npm/vue-toast-notification@3"></script>
+    <link href="https://cdn.jsdelivr.net/npm/vue-toast-notification@3/dist/theme-sugar.css" rel="stylesheet">
+    <!-- Init the plugin -->
+    <script>
+
+        function parseJwt(token) {
+            var base64Url = token.split('.')[1];
+            var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            var jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+
+            return JSON.parse(jsonPayload);
+        };
+
+        const APP_TOKEN = 'app_token';
+        const FREE_ACCESS_PAGES = ['login', 'signup', 'reset-password', '404'];
+        const API_ROUTES = {
+            root: 'http://localhost:8080',
+            auth: 'http://localhost:8080/api/auth',
+            refresh: 'http://localhost:8080/api/token/refresh',
+            me: 'http://localhost:8080/api/me',
+        }
+
+
+        // Functions
+        // Router Guards
+        async function canUserAccess(to, from, next) {
+
+            var app_token = localStorage.getItem(APP_TOKEN)
+
+            if ((!app_token) && (to.name !== 'login')) next({ name: 'login' })
+            else next();
+        }
+
+        async function tokenValid(to, from, next) {
+            var app_token = localStorage.getItem(APP_TOKEN)
+            if (app_token) app_token = JSON.parse(app_token) // Parse the json string value
+
+            var options = {
+                headers: {
+                    'Authorization': `Bearer ${(app_token ? app_token.token : '')}`
+                }
+            }
+
+            var mustRefresh = null;
+            if (app_token) {
+                const canAccess = await axios.get(API_ROUTES.me, options)
+                    .catch((error) => {
+                        let message = typeof error.response !== 'undefined' ? error.response.data.message : error.message;
+                        // localStorage.removeItem(APP_TOKEN)
+                        // store.commit('LOGIN_FAILLURE');
+                        // next({ name: 'login' });
+                        mustRefresh = true;
+                    }).finally(() => {
+                        if (mustRefresh) {
+                            // Refresh token
+                            return axios.post(API_ROUTES.refresh, { "refresh_token": app_token.refresh_token })
+                                .then((result) => {
+                                    store.commit('LOGIN_SUCCESS', result.data);
+                                    next({ name: to.name });
+                                })
+                                .catch((error) => {
+                                    let message = typeof error.response !== 'undefined' ? error.response.data.message : error.message;
+                                    localStorage.removeItem(APP_TOKEN);
+                                    store.commit('LOGIN_FAILLURE');
+                                    next({ name: 'login' });
+                                })
+                        }
+                    })
+
+                if (
+                    (typeof canAccess.data !== 'undefined')
+                    &&
+                    (to.name !== 'login')
+                ) {
+                    store.commit('LOGIN_SUCCESS', app_token);
+                    next()
+                } else next({ name: 'login' });
+            }
+        }
+
+
+        // Start vue3-sfc-loader
+        const OPTIONS = {
+            moduleCache: {
+                vue: Vue
+            },
+            async getFile(url) {
+
+                const res = await fetch(url);
+                if (!res.ok)
+                    throw Object.assign(new Error(res.statusText + ' ' + url), {
+                        res
+                    });
+                return {
+                    getContentData: asBinary => asBinary ? res.arrayBuffer() : res.text(),
+                }
+            },
+            addStyle(textContent) {
+                const style = Object.assign(document.createElement('style'), {
+                    textContent
+                });
+                const ref = document.head.getElementsByTagName('style')[0] || null;
+                document.head.insertBefore(style, ref);
+            },
+        }
+        const {
+            loadModule
+        } = window['vue3-sfc-loader'];
+        // End vue3-sfc-loader
+
+
+        const routes = [{
+            name: 'home',
+            path: '/',
+            component: Vue.defineAsyncComponent(() => loadModule('./pages/app-home.vue', OPTIONS)),
+            beforeEnter: [canUserAccess, tokenValid],
+        }, {
+            name: 'settings',
+            path: '/settings',
+            component: Vue.defineAsyncComponent(() => loadModule('./pages/app-settings.vue', OPTIONS)),
+            beforeEnter: [canUserAccess, tokenValid],
+        }, {
+            name: 'login',
+            path: '/login',
+            component: Vue.defineAsyncComponent(() => loadModule('./pages/app-login.vue', OPTIONS))
+        }, {
+            name: 'signup',
+            path: '/signup',
+            component: Vue.defineAsyncComponent(() => loadModule('./pages/app-signup.vue', OPTIONS))
+        }, {
+            name: 'reset-password',
+            path: '/reset-password',
+            component: Vue.defineAsyncComponent(() => loadModule('./pages/app-reset-password.vue', OPTIONS))
+        }, {
+            name: '404',
+            path: '/:pathMatch(.*)',
+            component: Vue.defineAsyncComponent(() => loadModule('./pages/app-404.vue', OPTIONS))
+        }]
+
+        const router = VueRouter.createRouter({
+            // 4. Provide the history implementation to use. We are using the hash history for simplicity here.
+            history: VueRouter.createWebHistory(),
+            routes, // short for `routes: routes`
+        })
+
+        const store = new Vuex.Store({
+            state() {
+                return {
+                    isConnected: null,
+                    access_token: null,
+                }
+            },
+            mutations: {
+                LOGIN_SUCCESS(state, payload) {
+                    state.isConnected = true;
+                    state.access_token = payload;
+
+                    if (payload) localStorage.setItem(APP_TOKEN, JSON.stringify(payload));
+                },
+                LOGIN_FAILLURE(state, payload) {
+                    state.isConnected, state.access_token = null;
+                    localStorage.removeItem(APP_TOKEN)
+                }
+            }
+        })
+
+        const app = Vue.createApp({
+            components: {
+                'app-header': Vue.defineAsyncComponent(() => loadModule('./components/app-header.vue', OPTIONS)),
+                'app-sidepanel': Vue.defineAsyncComponent(() => loadModule('./components/app-sidepanel.vue', OPTIONS)),
+                'app-footer': Vue.defineAsyncComponent(() => loadModule('./components/app-footer.vue', OPTIONS)),
+            },
+            data() {
+                return {
+                    showHeader: false,
+                    currentPath: window.location.hash,
+                    notMainTemplate: FREE_ACCESS_PAGES
+                }
+            },
+            mounted() {
+                window.addEventListener('hashchange', () => {
+                    this.currentPath = window.location.hash
+                })
+            },
+            methods: {},
+            watch: {
+                '$route': function (value) {
+                    // lets watch for route changes on our
+                    // main parent app component.
+
+                    if (this.notMainTemplate.includes(value.name)) {
+                        this.showHeader = false
+                    } else {
+                        this.showHeader = true
+                    }
+                }
+            }
+        });
+
+        router.beforeEach((to, from, next) => {
+            // For read current uri after each redirect
+            if (to.matched.some(record => record.meta.reuse === false)) {
+                app.key = to.path
+            } else {
+                app.key = null
+            }
+            next()
+        })
+
+        router.afterEach((to, from) => {
+
+            // To close sidepanel after navigatiokn
+            let closePanelBtn = document.getElementById("sidepanel-close")
+            if ((closePanelBtn) && (to.path !== from.path)) {
+                closePanelBtn.click();
+            }
+        });
+
+
+        app.use(router)
+        app.use(store)
+        app.use(VueToast.ToastPlugin);
+
+        app.mount('#app');
+
+
+    </script>
+
+</body>
+
+</html>
