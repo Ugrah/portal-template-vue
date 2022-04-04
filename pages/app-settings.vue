@@ -15,8 +15,8 @@
           <div class="col-12 col-md-8">
             <div class="app-card app-card-settings shadow-sm p-4">
               <div class="app-card-body">
-                <form class="settings-form">
-                  <div class="mb-3">
+                <form class="settings-form" @submit.prevent="generalForm">
+                  <div class="mb-3 d-none">
                     <label for="setting-input-1" class="form-label"
                       >Business Name<span
                         class="ms-2"
@@ -46,19 +46,33 @@
                       type="text"
                       class="form-control"
                       id="setting-input-1"
-                      value="Lorem Ipsum Ltd."
+                      value="--"
                       required
                     />
                   </div>
                   <div class="mb-3">
                     <label for="setting-input-2" class="form-label"
-                      >Contact Name</label
+                      >First name</label
                     >
                     <input
                       type="text"
                       class="form-control"
                       id="setting-input-2"
                       value="Steve Doe"
+                      v-model="user.firstname"
+                      required
+                    />
+                  </div>
+                  <div class="mb-3">
+                    <label for="setting-input-2" class="form-label"
+                      >Last name</label
+                    >
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="setting-input-2"
+                      value="Steve Doe"
+                      v-model="user.lastname"
                       required
                     />
                   </div>
@@ -70,7 +84,21 @@
                       type="email"
                       class="form-control"
                       id="setting-input-3"
-                      value="hello@companywebsite.com"
+                      value=""
+                      v-model="user.email"
+                      required
+                    />
+                  </div>
+                  <div class="mb-3">
+                    <label for="setting-input-2" class="form-label"
+                      >Username</label
+                    >
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="setting-input-2"
+                      v-model="user.username"
+                      required
                     />
                   </div>
                   <button type="submit" class="btn app-btn-primary">
@@ -120,8 +148,8 @@
           </div>
         </div>
         <!--//row-->
-        <hr class="my-4" />
-        <div class="row g-4 settings-section">
+        <hr class="my-4 d-none" />
+        <div class="row g-4 settings-section d-none">
           <div class="col-12 col-md-4">
             <h3 class="section-title">Data &amp; Privacy</h3>
             <div class="section-intro">
@@ -204,8 +232,8 @@
           </div>
         </div>
         <!--//row-->
-        <hr class="my-4" />
-        <div class="row g-4 settings-section">
+        <hr class="my-4 d-none" />
+        <div class="row g-4 settings-section d-none">
           <div class="col-12 col-md-4">
             <h3 class="section-title">Notifications</h3>
             <div class="section-intro">
@@ -298,10 +326,107 @@ module.exports = {
     ),
   },
   data: function () {
-    return {};
+    return {
+      user: {
+        id: null,
+        firstname: "",
+        lastname: "",
+        username: "",
+        roles: [],
+        email: "",
+      },
+    };
   },
   mounted() {
-    // console.log( this.$store.state.access_token )
+    this.getMe();
+  },
+  methods: {
+    getMe() {
+      var thisComp = this;
+      var root = this.$root;
+      var app_token = localStorage.getItem(root.APP_TOKEN);
+
+      console.log(app_token);
+
+      if (app_token) app_token = JSON.parse(app_token); // Parse the json string value
+
+      console.log(app_token);
+
+      var options = {
+        headers: {
+          Authorization: `Bearer ${app_token ? app_token.token : ""}`,
+        },
+      };
+
+      if (app_token) {
+        axios
+          .get(root.API_ROUTES.me, options)
+          .then((response) => {
+            console.log(response);
+            thisComp.user = response.data;
+          })
+          .catch((error) => {
+            let message =
+              typeof error.response !== "undefined"
+                ? error.response.data.message
+                : error.message;
+          })
+          .finally(() => {
+            console.log(thisComp.user);
+          });
+      }
+    },
+    generalForm(e) {
+      e.preventDefault();
+
+      // if (this.name && this.age) {
+      //   return true;
+      // }
+
+      // this.errors = [];
+
+      // if (!this.name) {
+      //   this.errors.push("Name required.");
+      // }
+      // if (!this.age) {
+      //   this.errors.push("Age required.");
+      // }
+
+      let thisComp = this;
+      let root = this.$root;
+
+
+      let toast = this.$toast;
+
+      let bodyData = root.clone(thisComp.user);
+      delete bodyData.id;
+
+      let app_token = localStorage.getItem(root.APP_TOKEN);
+
+      if (app_token) app_token = JSON.parse(app_token); // Parse the json string value
+      var options = {
+        headers: {
+          Authorization: `Bearer ${app_token ? app_token.token : ""}`,
+        },
+      };
+
+      // console.log( thisComp.user )
+      // return
+
+      axios
+        .put(root.API_ROUTES.users + "/" + thisComp.user.id, bodyData, options)
+        .then((result) => {
+          console.log(result);
+          toast.success("Data updated succefully", { position: "bottom" });
+        })
+        .catch((error) => {
+          let message =
+            typeof error.response !== "undefined"
+              ? error.response.data.message
+              : error.message;
+          toast.error(message, { position: "bottom" });
+        });
+    },
   },
 };
 </script>

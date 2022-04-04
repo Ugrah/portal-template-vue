@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>Portal - Grulog Admin Dashboard Template For Developers</title>
+    <title>Google API x Woocommer Contact</title>
 
     <!-- Meta -->
     <meta charset="utf-8">
@@ -86,6 +86,7 @@
             auth: 'http://localhost:8080/api/auth',
             refresh: 'http://localhost:8080/api/token/refresh',
             me: 'http://localhost:8080/api/me',
+            users: 'http://localhost:8080/api/users',
         }
 
 
@@ -242,7 +243,10 @@
                 return {
                     showHeader: false,
                     currentPath: window.location.hash,
-                    notMainTemplate: FREE_ACCESS_PAGES
+                    notMainTemplate: FREE_ACCESS_PAGES,
+
+                    APP_TOKEN: APP_TOKEN,
+                    API_ROUTES: API_ROUTES
                 }
             },
             mounted() {
@@ -250,7 +254,16 @@
                     this.currentPath = window.location.hash
                 })
             },
-            methods: {},
+            methods: {
+                clone(obj) {
+                    if (null == obj || "object" != typeof obj) return obj;
+                    var copy = obj.constructor();
+                    for (var attr in obj) {
+                        if (obj.hasOwnProperty(attr)) copy[attr] = obj[attr];
+                    }
+                    return copy;
+                }
+            },
             watch: {
                 '$route': function (value) {
                     // lets watch for route changes on our
